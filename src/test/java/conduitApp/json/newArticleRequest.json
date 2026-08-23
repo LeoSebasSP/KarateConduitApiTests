@@ -1,0 +1,8 @@
+{
+  "article": {
+    "title": "#(articleValues.title)",
+    "description": "#(articleValues.description)",
+    "body": "#(articleValues.body)",
+    "tagList": []
+  }
+}

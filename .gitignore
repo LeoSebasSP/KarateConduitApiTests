@@ -1,0 +1,23 @@
+# Maven build output - target/ ya estaba trackeado sin querer, incluye
+# target/karate-reports (los HTML de cada corrida) y las clases compiladas
+target/
+
+# IntelliJ - config local del IDE, no aporta nada al resto del equipo
+.idea/
+*.iml
+
+# Eclipse / VSCode, por si alguien lo abre con otro editor
+.vscode/
+.classpath
+.project
+.settings/
+
+# SO
+.DS_Store
+Thumbs.db
+
+# logs sueltos que a veces quedan tirados al debuggear
+*.log
+
+# por si en algún momento se agrega un .env con credenciales, que no se suba
+.env

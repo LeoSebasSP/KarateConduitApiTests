@@ -1,0 +1,17 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+    <!-- karate.runtime, karate.http, karate.mock, karate.server, karate.scenario, karate.console -->
+    <logger name="karate" level="DEBUG"/>
+
+    <!-- TRACE es el único nivel que imprime el body de request/response -->
+    <logger name="karate.http" level="TRACE"/>
+</configuration>
