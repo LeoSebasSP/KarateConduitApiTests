@@ -12,13 +12,15 @@
         <java.version>21</java.version>
         <maven.compiler.version>3.11.0</maven.compiler.version>
         <maven.surefire.version>3.0.0</maven.surefire.version>
+        <gatling.plugin.version>4.21.6</gatling.plugin.version>
+        <karate.version>2.0.4</karate.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>io.karatelabs</groupId>
             <artifactId>karate-junit6</artifactId>
-            <version>2.0.4</version>
+            <version>${karate.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -39,6 +41,12 @@
             <version>1.0.2</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>io.karatelabs</groupId>
+            <artifactId>karate-gatling</artifactId>
+            <version>${karate.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -48,6 +56,9 @@
                 <excludes>
                     <exclude>**/*.java</exclude>
                 </excludes>
+            </testResource>
+            <testResource>
+                <directory>src/test/resources</directory>
             </testResource>
         </testResources>
         <plugins>
@@ -68,7 +79,12 @@
                 <configuration>
                     <argLine>-Dfile.encoding=UTF-8</argLine>
                 </configuration>
-            </plugin>          
+            </plugin>
+            <plugin>
+                <groupId>io.gatling</groupId>
+                <artifactId>gatling-maven-plugin</artifactId>
+                <version>${gatling.plugin.version}</version>
+            </plugin>
         </plugins>        
     </build>       
     
