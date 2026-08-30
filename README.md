@@ -152,6 +152,50 @@ The `Dockerfile` copies both `src/test/java` and `src/test/resources` into the i
 docker compose run --rm karate-tests mvn gatling:test -Dgatling.simulationClass=conduitApp.performance.FirstPerfTest
 ```
 
+## Continuous integration (GitHub Actions)
+
+Two workflows live under `.github/workflows/`. That path isn't negotiable: GitHub only reads workflows from that exact folder at the repo root, and the `.yml` files have to sit directly inside `workflows/`, not in a subfolder of it. A folder named `github` (no dot) is silently ignored - no error, nothing shows up in the Actions tab.
+
+Before being committed, both files were validated with [actionlint](https://github.com/rhysd/actionlint), which checks them against the real GitHub Actions schema (a plain YAML linter won't - see the gotchas below):
+
+```bash
+docker run --rm -v "${PWD}:/repo" --workdir /repo rhysd/actionlint:latest -color
+```
+
+### `karate-tests.yml` - the functional suite
+
+| Trigger | What it's for |
+| --- | --- |
+| `push` to `main` | validates every change that lands |
+| `pull_request` targeting `main` | the quality gate - the check appears inside the PR and can be made required before merging |
+| `workflow_dispatch` | the **Run workflow** button in the Actions tab, with a dropdown to pick `prod` / `dev` / `cert` |
+
+The steps, in order: checkout the repo → install JDK 21 (Temurin) with `cache: maven` → `mvn clean test -Dtest=ConduitTest -Dkarate.env=<selected>` → upload `target/karate-reports/` as a downloadable artifact → write a summary table (environment, short commit SHA, Surefire output) to the run page via `$GITHUB_STEP_SUMMARY`.
+
+Two things worth pointing out. The upload and summary steps both carry `if: always()`, so the report survives a red build - which is exactly when you want to read it. And `concurrency` with `cancel-in-progress: true` means three pushes in a row leave only the last run alive, instead of burning minutes on results that are already obsolete.
+
+### `performance-tests.yml` - the Gatling simulations
+
+Manual only (`workflow_dispatch`), on purpose: these are load tests against a shared public API, and firing them on every push would be antisocial. The form has two dropdowns - which simulation to run (the six `Simulation` classes, by fully-qualified name) and which environment.
+
+Same first two steps, then `mvn clean test-compile gatling:test -Dgatling.simulationClass=<selected>` and an upload of `target/gatling/`.
+
+### Is this CI/CD?
+
+It's the CI half, honestly. Every push and PR gets built and tested automatically, with reports published and a gate that can block a merge - that's continuous integration, and it's the part that matters most for a test automation project.
+
+There's no CD here, because there's nothing to deploy: this repo is a test suite, not an application. In a real pipeline these workflows would be the quality gate *inside* someone else's deployment pipeline - the stage that decides whether a build is allowed to promote to the next environment. Worth being precise about the distinction rather than calling it "CI/CD" wholesale.
+
+### Gotchas (same as everywhere else in this project)
+
+- **A step can have `uses` or `run`, never both.** Pasting a new step's body into an existing step instead of creating a new list item produces a file that is *valid YAML* and parses fine - what it violates is the GitHub Actions schema. So a generic YAML linter passes it, the IDE shows a yellow warning that's easy to scroll past, and GitHub fails the run immediately with `Step cannot have both the 'uses' and 'run' keys` without executing anything. Quick way to check by eye: every `uses:` and every `run:` in the file must have its own `- name:` above it.
+- **`actionlint` needs a git repository.** Point it at a loose folder and it exits with code 3 and `no project was found in any parent directories` - it looks for `.git` to locate the project root. That's not a complaint about your workflows. Also, it prints nothing at all when everything is fine; use `-verbose` if you want proof it actually ran rather than silently doing nothing.
+- **The `workflow_dispatch` button only appears once the file is on the default branch.** Push a workflow to a feature branch and no amount of correctness will make **Run workflow** show up - it has to be merged to `main` first. The `push` and `pull_request` triggers do work from a branch, so those are testable earlier.
+- **`-Dtest=ConduitTest` in the functional workflow isn't decoration.** `FirstPerfTest` and `ArticlePerfTest` end in `Test`, so Surefire's default include pattern (`**/*Test.java`) picks them up. They have no `@Test` methods so nothing actually runs, but scoping the run to the one real JUnit class keeps the CI log honest about what it executed.
+- **`test-compile` has to come before `gatling:test`.** The goal doesn't compile anything on its own - it expects the simulation classes to already be in `target/test-classes`. Since the workflow starts with `clean`, invoking `gatling:test` by itself would fail to find the simulation.
+- **The `-Dkarate.env` input on the performance workflow doesn't actually reach the run.** This is the same library gap documented under "Performance testing" above: `karate-gatling` builds its suite through a path that never applies that override. The flag is passed for symmetry with the functional workflow and does no harm, but the environment is really being decided by `karate-config.js`'s fallback to `prod`. Don't spend an afternoon debugging why switching that dropdown changes nothing.
+- **Credentials are still hardcoded in `karate-config.js`.** `email`, `username` and `password` sit in the repo in plain text. It's a throwaway course account so nothing is at risk here, but the correct pattern is reading them from the environment (`java.lang.System.getenv('CONDUIT_PASSWORD')`) and injecting them from GitHub Secrets via an `env:` block on the step. Worth doing before this repo gets shown to anyone as an example of pipeline work.
+
 ## Things to keep in mind (learned the hard way)
 
 - **The API is shared.** Don't `match` exact counts like `articlesCount: 3` against the global feed or favorites - the count keeps climbing with every run (ours and every other student's, all hitting the same `karateTest5` test account). That match is commented out in `Favorite articles` for exactly this reason.

@@ -1,0 +1,56 @@
+name: Gatling Performance Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      simulation:
+        description: 'Execution of Gatling Simulations'
+        type: choice
+        options:
+          - conduitApp.performance.FirstPerfTest
+          - conduitApp.performance.ArticlePerfTest
+          - conduitApp.performance.CreateArticlesCustomFeeder
+          - conduitApp.performance.CreateArticlesFeederFromFile
+          - conduitApp.performance.SimulationSetup
+          - conduitApp.performance.UserThinkTime
+        default: conduitApp.performance.ArticlePerfTest
+      karate_env:
+        description: 'Environment'
+        type: choice
+        options: [ prod, dev, cert ]
+        default: prod
+
+permissions:
+  contents: read
+
+jobs:
+  performance:
+    name: Load Tests with Gatling
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Repository Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 21 Configuration
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Execution of Simulations
+        run: >
+          mvn -B --no-transfer-progress clean test-compile gatling:test
+          -Dgatling.simulationClass=${{ inputs.simulation }}
+          -Dkarate.env=${{ inputs.karate_env }}
+
+      - name: Upload Gatling report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gatling-report-${{ github.run_number }}
+          path: target/gatling/
+          retention-days: 14
+          if-no-files-found: warn
